@@ -1,0 +1,22 @@
+#######################################
+# Funciones criptográficas
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+Cripto	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+setAlgorithm	KEYWORD2
+calculateHash	KEYWORD2
+calculateHMAC	KEYWORD2
+encrypt	KEYWORD2
+decrypt	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
