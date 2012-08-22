@@ -13,8 +13,8 @@ extern botonera Bo2;
 extern uint8_t SmallFont[];
 
 // Uncomment the next two lines for the ITDB02 Shield
-UTFT        myGLCD(ITDB28,19,18,17,16);
-ITDB02_Touch  myTouch(15,20,14,8,9);
+UTFT        myGLCD(ITDB28,A5,A4,A3,A2);
+ITDB02_Touch  myTouch(A1,A3,A0,8,9);
 
 int x, y;
 /*
@@ -24,7 +24,7 @@ char stLast[20]="";
 */
 void setup()
 {
-// Initial setup
+  // Initial setup
   myGLCD.InitLCD(LANDSCAPE);
   myGLCD.clrScr();
 
@@ -44,17 +44,6 @@ void setup()
   dibuja_botonera(&Bo2);
 
 }
-
-// Draw a red frame while a button is touched
-/*void waitForIt(int x1, int y1, int x2, int y2)
-{
-  myGLCD.setColor(255, 0, 0);
-  myGLCD.drawRoundRect (x1, y1, x2, y2);
-  while (myTouch.dataAvailable())
-    myTouch.read();
-  myGLCD.setColor(255, 255, 255);
-  myGLCD.drawRoundRect (x1, y1, x2, y2);
-}*/
 
 void parseanddo(botonera  *B,int x, int y){
       boton *b;
@@ -87,8 +76,8 @@ void loop()
       x=myTouch.getX();
       y=myTouch.getY();
       myGLCD.setColor(255, 0, 0);
-      //myGLCD.drawPixel(x,y);
-      //myGLCD.setColor(255, 255, 255);
+      myGLCD.drawPixel(x,y);
+      myGLCD.setColor(255, 255, 255);
       parseanddo(&Bo1,x,y);      
       parseanddo(&Bo2,x,y);
     }
@@ -97,11 +86,16 @@ void loop()
 int sha1test(){
   redibujaB2();
   char res[100];
+  int t0 = millis();
   valor(&Bo1,res);
   myGLCD.print(res,0,16,0);
   Sha1.init();
   Sha1.print(res);
+  Keyboard.begin();
   printHash(Sha1.result());
+  Keyboard.end();
+  t0 = millis() - t0;
+  myGLCD.printNumI(t0, 250, 60, 6);
 }
 
 void printHash(uint8_t *hash) {
@@ -113,6 +107,7 @@ void printHash(uint8_t *hash) {
   }
   res[40] = 0;
   myGLCD.print(res,0,0,0);
+  Keyboard.println(res);
 }
 /*
 int aestest(){

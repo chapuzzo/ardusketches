@@ -1,403 +1,302 @@
 #include "mmc.h"
+#include "HW_AVR.h"
+#include <pins_arduino.h>
 
-#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
-    byte ex_SS=0;
-    #define MOSI    2
-    #define MISO    3
-    #define SCK     1
-#else
-    byte ex_SS=2;
-    #define MOSI    3
-    #define MISO    4
-    #define SCK     5
-#endif
-
-static volatile diskstates disk_state;
-
-void SPI_SS_HIGH()
+static void spiSend(uint8_t data)
 {
-    PORTB |= _BV(ex_SS);
+	SPDR = data;
+	while (!(SPSR & (1 << SPIF)));
 }
 
-void SPI_SS_LOW()
+static uint8_t spiRec(void) 
 {
-    PORTB &= ~_BV(ex_SS);
+	spiSend(0XFF);
+	return SPDR;
 }
 
-static byte spiTransferByte(byte data)
+static void spiSendLong(const uint32_t data)
 {
-  // send the given data
-  SPDR = data;
+	union 
+	{
+		unsigned long l;
+		unsigned char c[4];
+	} long2char;
 
-  // wait for transfer to complete
-  loop_until_bit_is_set(SPSR, 7);
-  // *** reading of the SPSR and SPDR are crucial
-  // *** to the clearing of the SPIF flag
-  // *** in non-interrupt mode
+	long2char.l = data;
 
-  // return the received data
-  return SPDR;
+	spiSend(long2char.c[3]);
+	spiSend(long2char.c[2]);
+	spiSend(long2char.c[1]);
+	spiSend(long2char.c[0]);
 }
 
-
-static uint32_t spiTransferLong(const uint32_t data)
+uint8_t waitNotBusy(uint16_t timeoutMillis) 
 {
-  // It seems to be necessary to use the union in order to get efficient
-  // assembler code.
-  // Beware, endian unsafe union
-  union {
-    unsigned long l;
-    unsigned char c[4];
-  }
-  long2char;
-
-  long2char.l = data;
-
-  // send the given data
-  SPDR = long2char.c[3];
-  // wait for transfer to complete
-  loop_until_bit_is_set(SPSR, SPIF);
-  long2char.c[3] = SPDR;
-
-  SPDR = long2char.c[2];
-  // wait for transfer to complete
-  loop_until_bit_is_set(SPSR, SPIF);
-  long2char.c[2] = SPDR;
-
-  SPDR = long2char.c[1];
-  // wait for transfer to complete
-  loop_until_bit_is_set(SPSR, SPIF);
-  long2char.c[1] = SPDR;
-
-  SPDR = long2char.c[0];
-  // wait for transfer to complete
-  loop_until_bit_is_set(SPSR, SPIF);
-  long2char.c[0] = SPDR;
-
-  return long2char.l;
+	uint16_t t0 = millis();
+	do 
+	{
+		if (spiRec() == 0XFF)	return true;
+	}
+	while (((uint16_t)millis() - t0) < timeoutMillis);
+	return false;
 }
 
-
-static char sdResponse(byte expected)
+uint8_t mmc::cardCommand(uint8_t cmd, uint32_t arg) 
 {
-  unsigned short count = 0x0FFF;
+	uint8_t status_;
 
-  while ((spiTransferByte(0xFF) != expected) && count )
-    count--;
+	cbi(P_SS, B_SS);
+	waitNotBusy(300);
+	spiSend(cmd | 0x40);
+	spiSendLong(arg);
 
-  // If count didn't run out, return success
-  return (count != 0);
+	uint8_t crc = 0xFF;
+	if (cmd == GO_IDLE_STATE)	crc = 0x95;  // correct crc for CMD0 with arg 0
+	if (cmd == SEND_IF_COND)	crc = 0x87;  // correct crc for CMD8 with arg 0X1AA
+	spiSend(crc);
+
+	for (uint8_t i = 0; ((status_ = spiRec()) & 0X80) && i != 0XFF; i++);
+	return status_;
 }
 
-
-static char sdWaitWriteFinish(void)
+uint8_t cardAcmd(uint8_t cmd, uint32_t arg) 
 {
-  unsigned short count = 0xFFFF; // wait for quite some time
-
-  while ((spiTransferByte(0xFF) == 0) && count )
-    count--;
-
-  // If count didn't run out, return success
-  return (count != 0);
+	mmc::cardCommand(APP_CMD, 0);
+	return mmc::cardCommand(cmd, arg);
 }
 
+uint8_t waitStartBlock(void) 
+{
+	uint8_t status_;
 
-static void deselectCard(void) {
-  // Send 8 clock cycles
-  SPI_SS_HIGH();
-  spiTransferByte(0xff);
+	uint16_t t0 = millis();
+	while ((status_ = spiRec()) == 0XFF) 
+	{
+		if (((uint16_t)millis() - t0) > SD_READ_TIMEOUT) 
+		{
+			mmc::_errorCode = SD_CARD_ERROR_READ_TIMEOUT;
+			goto fail;
+		}
+	}
+	if (status_ != STATUS_START_BLOCK) 
+	{
+		mmc::_errorCode = SD_CARD_ERROR_READ;
+		goto fail;
+	}
+	return true;
+
+fail:
+	sbi(mmc::P_SS, mmc::B_SS);
+	return false;
 }
 
-static byte crc7update(byte crc, const byte data) {
-  byte i;
-  bool bit;
-  byte c;
-
-  c = data;
-  for (i = 0x80; i > 0; i >>= 1) {
-    bit = crc & 0x40;
-    if (c & i) {
-      bit = !bit;
-    }
-    crc <<= 1;
-    if (bit) {
-      crc ^= 0x09;
-    }
-  }
-  crc &= 0x7f;
-  return crc & 0x7f;
+uint8_t setSckRate(uint8_t _speed) 
+{
+	if (_speed > 6) 
+	{
+		mmc::_errorCode = SD_CARD_ERROR_SCK_RATE;
+		return false;
+	}
+	SPCR = B01010000 | _speed;
+	return true;
 }
 
+uint8_t mmc::initialize(uint8_t speed) 
+{
+	uint16_t t0 = (uint16_t)millis();
+	uint32_t arg;
+	uint8_t status_;
 
-int mmc::sendCommand(const byte  command, const uint32_t parameter, const byte  deselect) {
-  union {
-    unsigned long l;
-    unsigned char c[4];
-  }
-  long2char;
+	P_SS	= portOutputRegister(digitalPinToPort(_SS));
+	B_SS	= digitalPinToBitMask(_SS);
+	P_MISO	= portOutputRegister(digitalPinToPort(_MISO));
+	B_MISO	= digitalPinToBitMask(_MISO);
+	P_MOSI	= portOutputRegister(digitalPinToPort(_MOSI));
+	B_MOSI	= digitalPinToBitMask(_MOSI);
+	P_SCK	= portOutputRegister(digitalPinToPort(_SCK));
+	B_SCK	= digitalPinToBitMask(_SCK);
 
-  byte  i,crc,errorcount;
-  uint16_t counter;
+	sbi(P_SS, B_SS);
+	sbi(P_SCK, B_SCK);
+	sbi(P_MISO, B_MISO);
+	pinMode(_SS, OUTPUT);
+	pinMode(_MOSI, OUTPUT);
+	pinMode(_SCK, OUTPUT);
+	pinMode(_MISO, INPUT);
+	pinMode(_SS_HW, OUTPUT);
+	digitalWrite(_SS_HW, HIGH); // disable any SPI device using hardware SS pin
 
-  long2char.l = parameter;
-  crc = crc7update(0  , 0x40+command);
-  crc = crc7update(crc, long2char.c[3]);
-  crc = crc7update(crc, long2char.c[2]);
-  crc = crc7update(crc, long2char.c[1]);
-  crc = crc7update(crc, long2char.c[0]);
-  crc = (crc << 1) | 1;
+	sbi(P_SS, B_SS);
 
-  errorcount = 0;
-  while (errorcount < CONFIG_SD_AUTO_RETRIES) {
-    // Select card
-    SPI_SS_LOW();
+	// Enable SPI, Master, clock rate f_osc/128
+	SPCR = (1 << SPE) | (1 << MSTR) | (1 << SPR1) | (1 << SPR0);
+	// clear double speed
+	SPSR &= ~(1 << SPI2X);
 
-    // Transfer command
-    spiTransferByte(0x40+command);
-    spiTransferLong(parameter);
-    spiTransferByte(crc);
+	for (uint8_t i = 0; i < 10; i++) spiSend(0XFF);
 
-    // Wait for a valid response
-    counter = 0;
-    do {
-      i = spiTransferByte(0xff);
-      counter++;
-    }
-    while (i & 0x80 && counter < 0x1000);
+	cbi(P_SS, B_SS);
 
-    // Check for CRC error
-    // can't reliably retry unless deselect is allowed
-    if (deselect && (i & STATUS_CRC_ERROR)) {
-      //      uart_putc('x');
-      deselectCard();
-      errorcount++;
-      continue;
-    }
+	while ((status_ = cardCommand(GO_IDLE_STATE, 0)) != STATUS_IN_IDLE) 
+	{
+		if (((uint16_t)millis() - t0) > SD_INIT_TIMEOUT) 
+		{
+			_errorCode = SD_CARD_ERROR_CMD0;
+			goto fail;
+		}
+	}
 
-    if (deselect) deselectCard();
-    break;
-  }
+	// check SD version
+	if ((cardCommand(SEND_IF_COND, 0x1AA) & STATUS_ILLEGAL_COMMAND)) 
+	{
+		_card_type = SD_CARD_TYPE_SD1;
+	} 
+	else 
+	{
+		// only need last byte of r7 response
+		for (uint8_t i = 0; i < 4; i++)	status_ = spiRec();
+		if (status_ != 0XAA) 
+		{
+			_errorCode = SD_CARD_ERROR_CMD8;
+			goto fail;
+		}
+		_card_type = SD_CARD_TYPE_SD2;
+	}
 
-  return i;
+	// initialize card and send host supports SDHC if SD2
+//	arg = _card_type == SD_CARD_TYPE_SD2 ? 0X40000000 : 0;
+	arg=0;
+
+	while ((status_ = cardAcmd(SD_SEND_OP_COND, arg)) != STATUS_READY) 
+	{
+		// check for timeout
+		if (((uint16_t)millis() - t0) > SD_INIT_TIMEOUT) 
+		{
+			_errorCode = SD_CARD_ERROR_ACMD41;
+			goto fail;
+		}
+	}
+	// if SD2 read OCR register to check for SDHC card
+	if (_card_type == SD_CARD_TYPE_SD2) 
+	{
+		if (cardCommand(READ_OCR, 0)) 
+		{
+			_errorCode = SD_CARD_ERROR_CMD58;
+			goto fail;
+		}
+		if ((spiRec() & 0XC0) == 0XC0)	_card_type = SD_CARD_TYPE_SDHC;
+		// discard rest of ocr - contains allowed voltage range
+		for (uint8_t i = 0; i < 3; i++) spiRec();
+	}
+	sbi(P_SS, B_SS);
+
+	return setSckRate(speed);;
+
+fail:
+	sbi(P_SS, B_SS);
+	return _errorCode;
 }
-
-
-
-byte mmc::initialize(byte speed) {
-  byte  i;
-  uint16_t counter;
-  uint32_t answer;
-
-  disk_state = DISK_ERROR;
-
-  // setup SPI I/O pins
-  PORTB |=  _BV(SCK) | _BV(ex_SS) | _BV(MISO); // set SCK+SS hi (no chip select), pullup on MISO
-  DDRB  |=  _BV(SCK) | _BV(ex_SS) | _BV(MOSI); // set SCK/MOSI/SS as output
-  DDRB  &= ~_BV(MISO);                       // set MISO as input
-
-  // setup SPI interface:
-  //   interrupts disabled, SPI enabled, MSB first, master mode,
-  //   leading edge rising, sample on leading edge, clock = f/4,
-  SPCR = B01010000 | speed;
-
-  // Enable SPI double speed mode -> clock = f/8
-  //  SPSR = _BV(SPI2X);
-
-  // clear status
-  i = SPSR;
-
-
-  // clear recieve buffer
-  i = SPDR;
-
-
-  SPI_SS_HIGH();
-
-  // Send 80 clks
-  for (i=0; i<10; i++) {
-    spiTransferByte(0xFF);
-  }
-
-  // Reset card
-  i = sendCommand(GO_IDLE_STATE, 0, 1);
-  if (i != 1) {
-    return STA_NOINIT | STA_NODISK;
-  }
-
-  counter = 0xffff;
-  // According to the spec READ_OCR should work at this point
-  // without retries. One of my Sandisk-cards thinks otherwise.
-  do {
-    // Send CMD58: READ_OCR
-    i = sendCommand(READ_OCR, 0, 0);
-    if (i > 1) {
-      // kills my Sandisk 1G which requires the retries in the first place
-      // deselectCard();
-    }
-  }
-  while (i > 1 && counter-- > 0);
-
-  if (counter > 0) {
-    answer = spiTransferLong(0);
-
-    // See if the card likes our supply voltage
-    if (!(answer & SD_SUPPLY_VOLTAGE)) {
-      // The code isn't set up to completely ignore the card,
-      // but at least report it as nonworking
-      deselectCard();
-      return STA_NOINIT | STA_NODISK;
-    }
-  }
-
-  // Keep sending CMD1 (SEND_OP_COND) command until zero response
-  counter = 0xffff;
-  do {
-    i = sendCommand(SEND_OP_COND, 1L<<30, 1);
-    counter--;
-  }
-  while (i != 0 && counter > 0);
-
-  if (counter==0) {
-    return STA_NOINIT | STA_NODISK;
-  }
-
-  // Send MMC CMD16(SET_BLOCKLEN) to 512 bytes
-  i = sendCommand(SET_BLOCKLEN, 512, 1);
-  if (i != 0) {
-    return STA_NOINIT | STA_NODISK;
-  }
-
-  // Thats it!
-  disk_state = DISK_OK;
-  return RES_OK;
-}
-
 
 byte mmc::readSector(byte *buffer, uint32_t sector)
 {
-    byte res,tmp,errorcount;
-    uint16_t crc,recvcrc;
+	uint8_t status_, tries;
 
-    errorcount = 0;
-    while (errorcount < CONFIG_SD_AUTO_RETRIES)
-    {
-        res = sendCommand(READ_SINGLE_BLOCK, (sector) << 9, 0);
+	if (_card_type != SD_CARD_TYPE_SDHC)	sector <<= 9;
 
-        if (res != 0)
-        {
-            SPI_SS_HIGH();
-            disk_state = DISK_ERROR;
-            return RES_ERROR;
-        }
+	tries=0;
+	status_ = cardCommand(READ_SINGLE_BLOCK, sector);
 
-        // Wait for data token
-        if (!sdResponse(0xFE))
-        {
-            SPI_SS_HIGH();
-            disk_state = DISK_ERROR;
-            return RES_ERROR;
-        }
+	while ((status_) and (tries<SD_READ_RETRIES))
+	{
+		status_ = cardCommand(READ_SINGLE_BLOCK, sector);
+	}
+	if (status_)
+	{
+		_errorCode = SD_CARD_ERROR_CMD17;
+		goto fail;
+	}
 
-        uint16_t i;
+	status_ = waitStartBlock();
+	if (!status_) 
+	{
+		_errorCode=status_;
+		goto fail;
+	}
 
-        // Get data
-        crc = 0;
-        for (i=0; i<512; i++)
-        {
-            tmp = spiTransferByte(0xff);
-            *(buffer++) = tmp;
-        }
+	SPDR = 0XFF;
 
-        // Check CRC
-        recvcrc = (spiTransferByte(0xFF) << 8) + spiTransferByte(0xFF);
+	for (uint16_t i = 0; i < 511; i++) 
+	{
+		while (!(SPSR & (1 << SPIF)));
+		buffer[i] = SPDR;
+		SPDR = 0XFF;
+	}
+	// wait for last byte
+	while (!(SPSR & (1 << SPIF)));
+	buffer[511] = SPDR;
 
-        break;
-    }
-    deselectCard();
+	return RES_OK;
 
-    if (errorcount >= CONFIG_SD_AUTO_RETRIES) return RES_ERROR;
-
-    return RES_OK;
+fail:
+	sbi(P_SS, B_SS);
+	return _errorCode;
 }
-
 
 byte mmc::writeSector(const byte *buffer, uint32_t sector)
 {
-    byte res,errorcount,status;
-    uint16_t crc;
+	uint8_t status_;
 
-    errorcount = 0;
-    while (errorcount < CONFIG_SD_AUTO_RETRIES)
-    {
-        res = sendCommand(WRITE_BLOCK, (sector)<<9, 0);
+	if (_card_type != SD_CARD_TYPE_SDHC) sector <<= 9;
 
-        if (res != 0)
-        {
-            SPI_SS_HIGH();
-            disk_state = DISK_ERROR;
-            return RES_ERROR;
-        }
+	if (cardCommand(WRITE_BLOCK, sector)) 
+	{
+		_errorCode = SD_CARD_ERROR_CMD24;
+		goto fail;
+	}
 
-        // Send data token
-        spiTransferByte(0xFE);
+	SPDR = DATA_START_BLOCK;
 
-        uint16_t i;
-        const byte *oldbuffer = buffer;
+	for (uint16_t i = 0; i < 512; i += 2) 
+	{
+		while (!(SPSR & (1 << SPIF)));
+		SPDR = buffer[i];
+		while (!(SPSR & (1 << SPIF)));
+		SPDR = buffer[i+1];
+	}
 
-        // Send data
-        crc = 0;
-        for (i=0; i<512; i++)
-        {
-            spiTransferByte(*(buffer++));
-        }
+	while (!(SPSR & (1 << SPIF)));
 
-        // Send CRC
-        spiTransferByte(crc >> 8);
-        spiTransferByte(crc & 0xff);
+	spiSend(0xff);  // dummy crc
+	spiSend(0xff);  // dummy crc
 
-        // Get and check status feedback
-        status = spiTransferByte(0xFF);
+	status_ = spiRec();
+	if ((status_ & DATA_RES_MASK) != DATA_RES_ACCEPTED) 
+	{
+		_errorCode = SD_CARD_ERROR_WRITE;
+		goto fail;
+	}
+  
+	// wait for flash programming to complete
+	if (!waitNotBusy(SD_WRITE_TIMEOUT)) 
+	{
+		_errorCode = SD_CARD_ERROR_WRITE_TIMEOUT;
+		goto fail;
+	}
+	// response is r2 so get and check two bytes for nonzero
+	if (cardCommand(SEND_STATUS, 0) || spiRec()) 
+	{
+		_errorCode = SD_CARD_ERROR_WRITE_PROGRAMMING;
+		goto fail;
+	}
+	sbi(P_SS, B_SS);
+	return RES_OK;
 
-        // Retry if neccessary
-        if ((status & 0x0F) != 0x05)
-        {
-            //  uart_putc('X');
-            deselectCard();
-            errorcount++;
-            buffer = oldbuffer;
-            continue;
-        }
-
-        // Wait for write finish
-        if (!sdWaitWriteFinish())
-        {
-            SPI_SS_HIGH();
-            disk_state = DISK_ERROR;
-            return RES_ERROR;
-        }
-        break;
-        deselectCard();
-
-        if (errorcount >= CONFIG_SD_AUTO_RETRIES)
-        {
-            if (!(status & STATUS_CRC_ERROR))
-            disk_state = DISK_ERROR;
-            return RES_ERROR;
-        }
-    }
-    return RES_OK;
+fail:
+	sbi(P_SS, B_SS);
+	return _errorCode;
 }
 
 void mmc::setSSpin(const uint8_t _pin)
 {
-#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
-    if (_pin==53)
-        ex_SS=0;
-    else if ((_pin>=10) and (_pin<=13))
-        ex_SS=_pin-6;
-#else
-    if ((_pin>=8) and (_pin<=10))
-        ex_SS=_pin-8;
-#endif
+	_SS=_pin;
 }
-
