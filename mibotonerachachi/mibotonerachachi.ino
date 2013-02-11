@@ -37,10 +37,10 @@ void setup()
   inicializa(&Bo1,0,32,240,240,7,6,0x001f);
   dibuja_botonera(&Bo1);
   
-  inicializa(&Bo2,240,180,320,240,2,2,0xf800);
+  inicializa(&Bo2,240,200,320,240,2,1,0xf800);
   Bo2.botones[1].color = 0x07e0;
   bind(&Bo2.botones[1],sha1test);
-  bind(&Bo2.botones[3],limpia);
+  bind(&Bo2.botones[0],limpia);
   dibuja_botonera(&Bo2);
 
 }
@@ -96,6 +96,19 @@ int sha1test(){
   Keyboard.end();
   t0 = millis() - t0;
   myGLCD.printNumI(t0, 250, 60, 6);
+}
+
+void printPass(uint8_t *hash) {
+  int i;
+  char *all = "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+  char res[41];
+  for (i=0; i<20; i++) {
+    res[i] = all[hash[i]%94];
+    Keyboard.write(res[i]);   
+  }
+  res[20] = 0;
+  myGLCD.print(res,0,0,0);
+  Keyboard.println("");
 }
 
 void printHash(uint8_t *hash) {

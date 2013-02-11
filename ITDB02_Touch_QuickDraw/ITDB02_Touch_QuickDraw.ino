@@ -17,8 +17,8 @@ extern uint8_t BigFont[];
 #include <ITDB02_Touch.h>
 
 // Uncomment the next two lines for the ITDB02 Shield
-UTFT        myGLCD(ITDB28,19,18,17,16);
-ITDB02_Touch  myTouch(15,20,14,8,9);
+UTFT        myGLCD(ITDB28,A5,A4,A3,A2);
+ITDB02_Touch  myTouch(A1,A3,A0,8,9);
 
 // Uncomment the next two lines for the ITDB02 Mega Shield
 //ITDB02        myGLCD(38,39,40,41);   // Remember to add ASPECT_16x9 if you are using an ITDB02-3.2WC!

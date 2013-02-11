@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-#define MARGEN 8
+#define MARGEN 4
 
 typedef struct{
     int id;

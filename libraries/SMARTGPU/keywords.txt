@@ -1,0 +1,42 @@
+#######################################
+# Syntax Coloring Map For SMART GPU
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+SMARTGPU	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+init                 KEYWORD2
+reset                KEYWORD2
+start                KEYWORD2
+erase                KEYWORD2
+sleep                KEYWORD2
+orientation          KEYWORD2
+bright               KEYWORD2
+baudChange           KEYWORD2
+digitalOut           KEYWORD2
+setScreenBackground  KEYWORD2
+setTextBackground    KEYWORD2
+memoryRead           KEYWORD2 
+putPixel             KEYWORD2
+drawLine             KEYWORD2
+drawRectangle        KEYWORD2
+drawTriangle         KEYWORD2
+drawCircle           KEYWORD2
+putLetter            KEYWORD2
+string               KEYWORD2
+stringSD             KEYWORD2
+icon                 KEYWORD2
+imageSD              KEYWORD2
+touchScreen          KEYWORD2
+touchIcon            KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################

@@ -1,3 +1,5 @@
+#include "digitalWriteFast.h"
+
 // ITDB02_Touch_Calibration (C)2010 Henning Karlsen
 // web: http://www.henningkarlsen.com/electronics
 //
@@ -20,9 +22,9 @@
 // Declare which fonts we will be using
 extern uint8_t SmallFont[];
 
-// Uncomment the next two lines for the ITDB02 Shield
-UTFT        myGLCD(ITDB28,19,18,17,16);
-ITDB02_Touch  myTouch(15,17,14,8,9);
+UTFT        myGLCD(ITDB28,A5,A4,A3,A2);
+ITDB02_Touch  myTouch(A1,A3,A0,8,9);
+
 
 // Uncomment the next two lines for the ITDB02 Mega Shield
 //ITDB02        myGLCD(38,39,40,41);   // Remember to add ASPECT_16x9 if you are using an ITDB02-3.2WC!
@@ -140,8 +142,7 @@ void startup()
   myGLCD.print("calibration stylus or the", LEFT, 218);
   myGLCD.print("result WILL BE very imprecise.", LEFT, 230);
   myGLCD.print("Touch screen to continue", CENTER, 305);
-  myGLCD.print("CARACULO", CENTER, 250);
-  
+
   waitForTouch();
   myGLCD.clrScr();
 }

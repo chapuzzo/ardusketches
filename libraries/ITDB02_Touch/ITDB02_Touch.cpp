@@ -45,6 +45,14 @@
 #define PixOffsX    258
 #define PixSizeY    10.94
 #define PixOffsY    400
+
+//~ #define PixSizeX    0.74
+//~ #define PixOffsX    1676
+//~ #define PixSizeY    0.01
+//~ #define PixOffsY    0
+
+
+
 #include "digitalWriteFast.h"
 #include "Arduino.h"
 #include "ITDB02_Touch.h"
