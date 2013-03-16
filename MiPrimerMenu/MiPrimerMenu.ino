@@ -13,7 +13,7 @@ void setup(){
 
 void creaMenus(){
   root = (menu*)calloc(10,sizeof(menu));
-  //              texto            , ini ,  s  ,    l  ,    u  ,    d  ,   r
+  //              texto            , abbr, ini ,  s  ,    l  ,    u  ,    d  ,   r
   root[0] = (menu){"Menu Principal", 'P', NULL, NULL, root+1, root+2, root+3, root+4 };
   root[1] = (menu){"Izquierda     ", 'L', NULL, NULL, root+1, root+2, root+3, root+4 };
   root[2] = (menu){"Arriba        ", 'U', NULL, NULL, root+1, root+2, root+3, root+4 };
