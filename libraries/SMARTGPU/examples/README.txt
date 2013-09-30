@@ -4,6 +4,8 @@
 
 /Those examples help the user to communicate the SMARTGPU BOARD with the arduino board, be sure to check pinout while mounting the SMARTGPU!
 
+//BE SURE TO INSTALL SMARTGPU ARDUINO LIBRARY V4!!!
+
 /For the very first time of using SMARTGPU, program the bare arduino board without the SMARTGPU mounted, next times the SMARTGPU could be mounted without problem while the arduino is being programmed. (this is to protect the I/O pins of the arduino to avoid an Output be connected to an Output and case wrong voltage loading)
 
 /Open and compile any example, once it's loaded into the arduino, just press the external RESET switch on the SMARTGPU board

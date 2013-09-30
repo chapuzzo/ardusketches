@@ -1,5 +1,5 @@
 /*********************************************************
-VIZIC TECHNOLOGIES. COPYRIGHT 2012.
+VIZIC TECHNOLOGIES. COPYRIGHT 2013.
 THE DATASHEETS, SOFTWARE AND LIBRARIES ARE PROVIDED "AS IS." 
 VIZIC EXPRESSLY DISCLAIM ANY WARRANTY OF ANY KIND, WHETHER 
 EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO, THE IMPLIED 
@@ -12,6 +12,8 @@ ANY CLAIMS BY THIRD PARTIES (INCLUDING BUT NOT LIMITED TO
 ANY DEFENCE THEREOF), ANY CLAIMS FOR INDEMNITY OR CONTRIBUTION,
 OR OTHER SIMILAR COSTS.
 *********************************************************/
+
+//SMARTGPU Arduino Library V4
 
 /********************************************************
  IMPORTANT : This library is created for the Arduino 1.0 Software IDE
@@ -76,6 +78,28 @@ OR OTHER SIMILAR COSTS.
 #define FONT6   0x06
 #define FONT7   0x07
 
+//miniSMARTGPU Command Execution responses definitions
+#define OK                  0
+#define DISK_ERROR          1
+#define INT_ERROR           2
+#define NOT_READY           3
+#define NO_FILE             4
+#define NO_PATH             5
+#define INVALID_NAME        6
+#define DENIED              7
+#define ALREADY_EXIST       8
+#define INVALID_OBJECT      9
+#define WRITE_PROTECTED    10
+#define INVALID_DRIVE      11
+#define NOT_ENABLED        12
+#define NO_FILE_SYSTEM     13
+#define MAKE_FILE_ABORTED  14
+#define TIMEOUT            15
+#define LOCKED             16
+#define NOT_ENOUGHT_CORE   17
+#define TOO_MANY_FILES     18
+#define INVALID_PARAMETER  19
+
 class SMARTGPU{
 	
 public:
@@ -128,22 +152,31 @@ public:
 	uint8_t touchScreen(int[]);
 	
 	uint8_t touchIcon(char[]);
+	
+	uint8_t touchRaw(uint8_t[]); //
+	
+	uint8_t calibrate(uint16_t , uint16_t , uint16_t , uint16_t );     //
+
+	uint8_t	SDFgetNumberOfFiles(unsigned char*);
+	
+	uint8_t	SDFgetFileNumName(unsigned char, char[]);	
 
 /****************************************************************/
 //Those next functions return file execution status instead of ACK 'O' or NAK 'F'
 /****************************************************************/
 	
-	uint8_t SDfopen(uint8_t, char[]);
+	uint8_t SDFopenFile(uint8_t, char[]);
 	
-	uint8_t SDfclose();
+	uint8_t SDFcloseFile();
 	
-	uint8_t SDfsync();
+	uint8_t SDFsaveFile();
 	
-	uint8_t SDfpointer(unsigned long);	
+	uint8_t SDFsetPointer(unsigned long);	
 
-	uint8_t SDfread(unsigned int, char[], unsigned int*);	
+	uint8_t SDFreadFile(unsigned int, char[], unsigned int*);	
 
-	uint8_t SDfwrite(unsigned int, char[], unsigned int*);		
+	uint8_t SDFwriteFile(unsigned int, char[], unsigned int*);
+	
 };
 
 #endif

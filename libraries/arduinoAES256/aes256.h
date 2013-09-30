@@ -17,6 +17,8 @@
 *   ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 *   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
+#ifndef _AES_H_
+#define _AES_H_
 
 #include <Arduino.h>
 
@@ -40,3 +42,4 @@ extern "C" {
 }
 #endif
 
+#endif

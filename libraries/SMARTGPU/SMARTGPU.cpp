@@ -1,5 +1,5 @@
 /*********************************************************
-VIZIC TECHNOLOGIES. COPYRIGHT 2012.
+VIZIC TECHNOLOGIES. COPYRIGHT 2013.
 THE DATASHEETS, SOFTWARE AND LIBRARIES ARE PROVIDED "AS IS." 
 VIZIC EXPRESSLY DISCLAIM ANY WARRANTY OF ANY KIND, WHETHER 
 EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO, THE IMPLIED 
@@ -13,20 +13,20 @@ ANY DEFENCE THEREOF), ANY CLAIMS FOR INDEMNITY OR CONTRIBUTION,
 OR OTHER SIMILAR COSTS.
 *********************************************************/
 
+//SMARTGPU Arduino Library V4
+
 /********************************************************
  IMPORTANT : This library is created for the Arduino 1.0 Software IDE
 ********************************************************/
 
 #include <avr/interrupt.h>
 #include <Arduino.h> 
-
+	
 #include "SMARTGPU.h"
 
-//#if
-
+#ifdef __AVR_ATmega32U4__
 #define Serial Serial1
-
-//#endif
+#endif
 
 // SMART GPU DEFAULT BAUD RATE: 9600bps
 
@@ -175,10 +175,13 @@ uint8_t SMARTGPU::memoryRead(int x1, int y1, int x2, int y2, char buffer[]){ //R
   //receive all the pixels
   for(j=0;j<=(y2-y1);j++){
 	for(i=0;i<=(x2-x1);i++){
+		while(Serial.available() == 0);	
 		buffer[k]=Serial.read(); //Red
 		k++;
+		while(Serial.available() == 0);	
 		buffer[k]=Serial.read(); //Green
 		k++;
+		while(Serial.available() == 0);			
 		buffer[k]=Serial.read(); //Blue
 		k++;
 	}	
@@ -334,7 +337,7 @@ uint8_t SMARTGPU::stringSD(int x1, int y1, int x2, int y2, int colour, uint8_t f
   Serial.write(BR>>8);
   Serial.write(BR);  
   while(1){
-	Serial.write(name[counter]);
+	Serial.print(name[counter]);
     if(name[counter]==0x00){
       break;
 	}	
@@ -423,15 +426,102 @@ uint8_t SMARTGPU::touchIcon(char buffer[]){          //Ask for a touch on the ic
   }
 }
 
+uint8_t SMARTGPU::touchRaw(uint8_t buffer[]){        //Ask for touch, wherever it is, always returns 1  
+    Serial.write('G');
+  while(Serial.available() < 5);
+  buffer[0]=Serial.read();
+  buffer[1]=Serial.read();
+  buffer[2]=Serial.read();
+  buffer[3]=Serial.read();
+  buffer[4]=0;
+  Serial.read();
+  if (buffer[0] == 'N') return 0;
+  return 1;
+}
+
+uint8_t SMARTGPU::calibrate(uint16_t xsub, uint16_t ysub, uint16_t xdiv, uint16_t ydiv){       //
+  Serial.write('K'); 
+  Serial.write('U'); 
+  Serial.write(xsub>>8); 
+  Serial.write(xsub);
+  Serial.write(ysub>>8);
+  Serial.write(ysub);
+  Serial.write(xdiv>>8); 
+  Serial.write(xdiv);
+  Serial.write(ydiv>>8);
+  Serial.write(ydiv);  
+  Serial.write('W');
+  while(Serial.available() == 0);  
+  return Serial.read();
+}
+
+
+uint8_t SMARTGPU::SDFgetNumberOfFiles(unsigned char *numOfFiles){
+  unsigned char fileCounter=0, data=0, aux=0;
+  
+  delay(1);    
+  Serial.write('H'); //List Files to get number of files
+  do{
+	while(Serial.available()==0);
+	data=Serial.read(); 
+	if(data==',') fileCounter++; //if we find a comma then we increase file counter	
+  }while(data!=0x00);
+
+  *numOfFiles=fileCounter;
+  
+  while(Serial.available()==0);  
+  aux= Serial.read();
+  return aux;
+}
+
+uint8_t SMARTGPU::SDFgetFileNumName(unsigned char fileNumber, char buffer[]){ //searches for the "fileNumber" parameter(must be different than zero) on the file list and updates the buffer with the file name ended with NULL character
+  unsigned char fileCounter=0, data=0, aux=0, i=1, j=0;
+  
+  delay(1);    
+  Serial.write('H'); //List Files to get number of files
+  do{
+	while(Serial.available() == 0);  
+	data=Serial.read(); 
+	if(data==',') fileCounter++; //if we find a comma then we increase file counter	
+  }while(data!=0x00);
+  
+  while(Serial.available() == 0);  
+  if(Serial.read()!='O') return 'F'; 
+  
+  while(Serial.available() != 0) Serial.read(); //flush RX buffer
+  
+  if((fileNumber>fileCounter) | fileNumber == 0x00){//if the requested file name is invalid(0x00) or is bigger than available number of files
+	return 0x13; //invalid parameter   
+  }
+
+  delay(10);    
+  Serial.write('H'); //List Files  
+
+  while(i<fileNumber){
+	while(Serial.available() == 0);  
+	if(Serial.read()==',') i++; //if we find a comma then we increase i
+  }
+  while(1){
+	while(Serial.available() == 0);  
+	data=Serial.read(); 
+	if(data==',') break; //if we find a comma then we break
+    buffer[j++]=data;	
+  }
+  while(Serial.read()!=0x00); //wait until we receive all the rest of file names  
+  aux=Serial.read(); //save response
+  buffer[j]=0x00; //add the NULL character to the file Name
+  return aux;
+}
+
 /****************************************************************/
 //Those next functions return file execution status instead of ACK 'O' or NAK 'F'
 /****************************************************************/
 
-uint8_t SMARTGPU::SDfopen(uint8_t mode, char name[]){
+uint8_t SMARTGPU::SDFopenFile(uint8_t mode, char name[]){
   uint8_t counter=0;
   uint8_t aux = 0;
   
-  delay(1);
+  delay(100);
   Serial.write('F'); //memory card file management
   Serial.write('O'); //file open
   Serial.write(mode);
@@ -449,10 +539,10 @@ uint8_t SMARTGPU::SDfopen(uint8_t mode, char name[]){
   return aux;
 }
 
-uint8_t SMARTGPU::SDfclose(){
+uint8_t SMARTGPU::SDFcloseFile(){
   uint8_t aux = 0;
 
-  delay(5);
+  delay(50);
   Serial.write('F'); //memory card file management
   Serial.write('C'); //file close
   
@@ -462,7 +552,7 @@ uint8_t SMARTGPU::SDfclose(){
   return aux;  
 }
 
-uint8_t SMARTGPU::SDfsync(){
+uint8_t SMARTGPU::SDFsaveFile(){
   uint8_t aux = 0;
   
   Serial.write('F'); //memory card file management
@@ -474,7 +564,7 @@ uint8_t SMARTGPU::SDfsync(){
   return aux;  
 }
 
-uint8_t SMARTGPU::SDfpointer(unsigned long position){
+uint8_t SMARTGPU::SDFsetPointer(unsigned long position){ //moves the file read/write pointer to the provided position parameter
   uint8_t aux = 0;
   
   Serial.write('F'); //memory card file management
@@ -490,7 +580,7 @@ uint8_t SMARTGPU::SDfpointer(unsigned long position){
   return aux;  
 }	
 
-uint8_t SMARTGPU::SDfread(unsigned int BTR, char buffer[], unsigned int *SRB){ //Bytes to Read, Read Buffer, Succesfully Readed Bytes
+uint8_t SMARTGPU::SDFreadFile(unsigned int BTR, char buffer[], unsigned int *SRB){ //Bytes to Read, Read Buffer, Succesfully Read Bytes
   uint8_t aux = 0;
   unsigned int x=0, sr=0;
 
@@ -499,24 +589,25 @@ uint8_t SMARTGPU::SDfread(unsigned int BTR, char buffer[], unsigned int *SRB){ /
   Serial.write(BTR>>8);
   Serial.write(BTR);  
   for(x=0;x<BTR;x++){
+	while(Serial.available() == 0);  
 	buffer[x]=Serial.read();
   }
+  while(Serial.available() < 4);  
   sr=Serial.read();
   sr=sr<<8;
   sr|=Serial.read();
   
-  while(Serial.available() < 2);  
   aux= Serial.read();
   Serial.read();
   *SRB = sr;  
   return aux;  
 }	
 
-uint8_t SMARTGPU::SDfwrite(unsigned int BTW, char buffer[], unsigned int *SWB){ //Bytes to Write, Write Buffer, Succesfully Written Bytes
+uint8_t SMARTGPU::SDFwriteFile(unsigned int BTW, char buffer[], unsigned int *SWB){ //Bytes to Write, Write Buffer, Succesfully Written Bytes
   uint8_t aux = 0;
   unsigned int x=0, sw=0;
 
-  delay(1);  
+  delay(10);  
   Serial.write('F'); //memory card file management
   Serial.write('W'); //file write
   Serial.write(BTW>>8);
@@ -524,6 +615,7 @@ uint8_t SMARTGPU::SDfwrite(unsigned int BTW, char buffer[], unsigned int *SWB){ 
   for(x=0;x<BTW;x++){
 	Serial.write(buffer[x]);
   }
+  while(Serial.available() < 4);  
   sw=Serial.read();
   sw=sw<<8;
   sw|=Serial.read();
@@ -534,3 +626,4 @@ uint8_t SMARTGPU::SDfwrite(unsigned int BTW, char buffer[], unsigned int *SWB){ 
   *SWB = sw;   
   return aux;   
 }
+

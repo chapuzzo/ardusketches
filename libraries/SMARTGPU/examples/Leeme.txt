@@ -7,6 +7,8 @@ ARDUINO: ASEGURARSE DE CARGAR CUALQUIER DEMO SIN LA PANTALLA MONTADA POR PRIMERA
 /*****************************************************************/
 Cada demo o aplicacion tiene su contenido a usar(imagenes o archivos de texto).
 
+//Asegurese de instalar la Libreria SmartGPU V4!!!
+
 Para que el SMARTGPU pueda reconocer las imagenes o archivos de texto deben estar guardados en la carpeta /ROOT o raiz de la micro SD, cualquier archivo dentro de algun otro directorio o folder no podra ser llamado desde la SMARTGPU, sin embargo estos archivos no interferieren en el funcionamiento  del SMARTGPU
 
 /*****************************************************************/

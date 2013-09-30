@@ -7,14 +7,23 @@ menu *root, *m;
 
 void setup(){
   lcd.begin(16,2);
- Serial.begin(9600);
+  Serial.begin(9600);
   creaMenus();
+}
+
+void p_it(){
+  //Keyboard.begin();
+  const char *it="@#1234abcde";
+  Keyboard.write("@#1234abcde");
+  //Keyboard.end();
+  lcd.setCursor(9,1);
+  lcd.print(it);
 }
 
 void creaMenus(){
   root = (menu*)calloc(10,sizeof(menu));
   //              texto            , abbr, ini ,  s  ,    l  ,    u  ,    d  ,   r
-  root[0] = (menu){"Menu Principal", 'P', NULL, NULL, root+1, root+2, root+3, root+4 };
+  root[0] = (menu){"Menu Principal", 'P', NULL, p_it, root+1, root+2, root+3, root+4 };
   root[1] = (menu){"Izquierda     ", 'L', NULL, NULL, root+1, root+2, root+3, root+4 };
   root[2] = (menu){"Arriba        ", 'U', NULL, NULL, root+1, root+2, root+3, root+4 };
   root[3] = (menu){"Abajo         ", 'D', NULL, NULL, root+1, root+2, root+3, root+4 };
@@ -61,7 +70,7 @@ void loop(){
     case 'D': setMenu(m->d); while(boton(analogRead(A0))=='D'); break;
     case 'S': if (m->s != NULL)m->s(); while(boton(analogRead(A0))=='S'); break;
   }
-  delay(10);
+  //delay(10);
 }
 
 String s;

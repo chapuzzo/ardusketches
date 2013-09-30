@@ -1,6 +1,6 @@
 
 /**************************************************************/
-  SMARTGPU ARDUINO 1.0 LIBRARY
+  SMARTGPU ARDUINO 1.0 LIBRARY V4
 
 This library help the user to communicate the SMARTGPU BOARD with the arduino board, be sure to check pinout while mounting the SMARTGPU!
 
@@ -17,13 +17,13 @@ be sure to check out all the SMARTGPU examples 100% ready to compile and load in
 /**************************************************************/
 
 SMARTGPU board:
-http://www.vizictechnologies.com/#/desarrollo/4554296549
+http://vizictechnologies.com/#/smart-gpu/4554296549
 
 Software:
-http://www.vizictechnologies.com/#/software-demos/4554679040
+http://vizictechnologies.com/#/software-demos-sg/4554679040
 
 
-VIZIC TECHNOLOGIES Copyright 2011
+VIZIC TECHNOLOGIES Copyright 2013
 
 www.vizictechnologies.com
 /**************************************************************/
