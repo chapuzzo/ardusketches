@@ -3,12 +3,12 @@ int x=523;
 #include "aes256.h"
 
 #define DUMP(str, i, buf, sz) { Serial.println(str); \
-                               for(i=0; i<(sz); ++i) { if(buf[i]<0x10) Serial.print('0'); Serial.print(buf[i], HEX); } \
-                               Serial.println(); }
+ for(i=0; i<(sz); ++i) { if(buf[i]<0x10) Serial.print('0'); Serial.print(buf[i], HEX); } \
+ Serial.println(); }
 
-aes256_context ctxt;
+ aes256_context ctxt;
 
-void setup() {
+ void setup() {
   x++;
   int i;
   Serial.begin(19200);

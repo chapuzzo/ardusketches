@@ -1,0 +1,3 @@
+[submodule "rfid"]
+	path = rfid
+	url = git@github.com:miguelbalboa/rfid.git

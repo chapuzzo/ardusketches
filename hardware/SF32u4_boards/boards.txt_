@@ -1,0 +1,35 @@
+##############################################################
+
+promicro16.name=Arduino Pro Micro
+promicro16.vid.0=0x1B4F
+promicro16.pid.0=0x9206
+promicro16.vid.1=0=0x1B4F
+promicro16.pid.1=0x9206
+promicro16.upload.tool=avrdude
+promicro16.upload.protocol=avr109
+promicro16.upload.maximum_size=28672
+promicro16.upload.maximum_data_size=2560
+promicro16.upload.speed=57600
+promicro16.upload.disable_flushing=true
+promicro16.upload.use_1200bps_touch=true
+promicro16.upload.wait_for_upload_port=true
+
+promicro16.bootloader.tool=avrdude
+promicro16.bootloader.low_fuses=0xff
+promicro16.bootloader.high_fuses=0xd8
+promicro16.bootloader.extended_fuses=0xcb
+promicro16.bootloader.file=caterina/Caterina-promicro16.hex
+promicro16.bootloader.unlock_bits=0x3F
+promicro16.bootloader.lock_bits=0x2F
+
+promicro16.build.mcu=atmega32u4
+promicro16.build.f_cpu=16000000L
+promicro16.build.vid=0x1B4F
+promicro16.build.pid=0x9206
+promicro16.build.usb_product="Arduino Pro Micro"
+promicro16.build.board=AVR_PROMICRO
+promicro16.build.core=arduino
+promicro16.build.variant=promicro
+promicro16.build.extra_flags={build.usb_flags}
+
+##############################################################

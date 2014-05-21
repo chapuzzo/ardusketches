@@ -1,3 +1,0 @@
-UTFTtf	KEYWORD1
-
-loadBitmap	KEYWORD2
